@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Lire le PDF · Mes lectures</title>
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/reader.js"></script>
+  </head>
+  <body class="pdf-reader">
+    <header class="pdf-reader-header">
+      <div class="pdf-reader-nav">
+        <a class="btn btn-ghost" id="readerBack" href="/">Retour</a>
+        <h1>Lire le PDF</h1>
+        <a class="btn btn-ghost" id="readerDownload" hidden download>Télécharger</a>
+      </div>
+      <div class="pdf-reader-nav" aria-label="Navigation dans le PDF">
+        <button type="button" class="btn btn-ghost" id="pagePrev" disabled>Précédente</button>
+        <label class="pdf-page-label">
+          <span>Page</span>
+          <input type="number" id="pageNumber" min="1" value="1" inputmode="numeric" aria-label="Numéro de page" disabled>
+          <span id="pageTotal"></span>
+        </label>
+        <button type="button" class="btn btn-ghost" id="pageNext" disabled>Suivante</button>
+      </div>
+    </header>
+    <main class="pdf-reader-page" id="readerPage">
+      <p id="readerStatus" class="muted" role="status">Chargement du PDF…</p>
+      <canvas id="readerCanvas" role="img" aria-label="Page du PDF" hidden></canvas>
+    </main>
+  </body>
+</html>

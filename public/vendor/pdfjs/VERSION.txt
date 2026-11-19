@@ -1,0 +1,2 @@
+Mozilla PDF.js 6.5.438 (pdfjs-dist)
+https://github.com/mozilla/pdf.js/releases/tag/v6.5.438

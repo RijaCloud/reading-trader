@@ -1,0 +1,14 @@
+{
+  "name": "reading-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Suivi de lectures et de progression — bibliothèque personnelle, sessions, objectifs. Mobile first, zéro dépendance.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
