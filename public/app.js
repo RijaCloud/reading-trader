@@ -1,3 +1,5 @@
+import { FILE_LIMIT_MIB } from './file-limits.js';
+
 /* ------------------------------------------------------------------ */
 /* tiny helpers                                                        */
 /* ------------------------------------------------------------------ */
@@ -830,6 +832,41 @@ function readingFileUrl(id) {
   return `/api/books/${encodeURIComponent(id)}/file`;
 }
 
+const sourceNames = { libgen: 'Library Genesis', zlibrary: 'Z-Library', annas: 'Anna’s Archive' };
+
+function sourceStatus(line) {
+  if (line.reason === 'credentials_missing') return 'Compte requis';
+  if (line.reason === 'route_off') return 'Source inactive';
+  if (line.state === 'rows') return 'Résultats reçus';
+  if (line.state === 'empty') return 'Aucun résultat';
+  if (line.state === 'failed') return 'Erreur de la source';
+  if (line.state === 'late') return 'Délai dépassé';
+  if (line.reason === 'not_requested' || line.reason === 'not_in_default_order') return 'Non consultée';
+  return 'Indisponible';
+}
+
+function catalogueEditions(catalogue) {
+  if (!catalogue) return '';
+  return `
+    <p class="small muted">Éditions dans le catalogue Open Library</p>
+    ${catalogue.editions.length ? `<ul class="source-editions" aria-label="Éditions Open Library">
+      ${catalogue.editions.map((edition) => {
+        const metadata = [edition.publisher, edition.date, edition.pages ? `${fmtNum(edition.pages)} p.` : '']
+          .filter(Boolean).map(esc).join(' · ');
+        return `<li>
+          <div class="grow">
+            <strong>${esc(edition.title)}</strong>
+            ${metadata ? `<p class="tiny muted">${metadata}</p>` : ''}
+          </div>
+          <a class="btn btn-ghost" href="${esc(edition.url)}" target="_blank" rel="noopener">Consulter</a>
+        </li>`;
+      }).join('')}
+    </ul>` : ''}
+    <a class="btn btn-ghost" href="${esc(catalogue.url)}" target="_blank" rel="noopener">
+      ${catalogue.editions.length ? 'Toutes les éditions sur Open Library' : 'Rechercher sur Open Library'}
+    </a>`;
+}
+
 function sourceEditions(sheet) {
   const search = sheet.fileSearch;
   if (!search) return '';
@@ -839,8 +876,11 @@ function sourceEditions(sheet) {
     ? `<p class="small muted">${fmtNum(search.ignored)} résultat${search.ignored === 1 ? '' : 's'} écarté${search.ignored === 1 ? '' : 's'} (extrait ou fichier incompatible).</p>`
     : '';
 
-  const sourceNames = { libgen: 'Library Genesis', zlibrary: 'Z-Library', annas: 'Anna’s Archive' };
+  const sources = search.sources?.map((line) =>
+    `${esc(sourceNames[line.source] || line.source)} · ${esc(sourceStatus(line))}`);
   return `
+    ${sources?.length ? `<p class="small muted">${sources.join('<br>')}</p>` : ''}
+    ${search.fileSourceError && !sources?.length ? `<p class="small muted">${esc(search.fileSourceError)}</p>` : ''}
     ${search.rows.length ? `<ul class="source-editions" aria-label="Éditions disponibles">
       ${search.rows.map((row) => {
         const metadata = [row.author, row.format.toUpperCase(), row.language, row.year,
@@ -852,13 +892,14 @@ function sourceEditions(sheet) {
             <strong>${esc(row.title || 'Édition sans titre')}</strong>
             <p class="tiny muted">${metadata}</p>
           </div>
-          <button class="btn btn-primary" type="button" data-action="acquire-reading-file"
-            data-ref="${esc(row.ref)}" ${sheet.fileBusy ? 'disabled' : ''}>Récupérer</button>
+          ${row.downloadable === false ? '<span class="tiny muted">Téléchargement indisponible</span>' :
+            `<button class="btn btn-primary" type="button" data-action="acquire-reading-file"
+              data-ref="${esc(row.ref)}" ${sheet.fileBusy ? 'disabled' : ''}>Récupérer</button>`}
         </li>`;
       }).join('')}
-    </ul>` : '<p class="small muted">Aucune autre édition compatible trouvée.</p>'}
+    </ul>` : '<p class="small muted">Aucun fichier récupérable dans les résultats.</p>'}
     ${ignored}
-    ${search.complete === false ? '<p class="small muted">Certaines sources n’ont pas répondu.</p>' : ''}`;
+    ${catalogueEditions(search.catalogue)}`;
 }
 
 function readingFileContent(sheet) {
@@ -875,7 +916,7 @@ function readingFileContent(sheet) {
     ? `${file.format.toUpperCase()} · ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(
         file.size >= 1024 * 1024 ? file.size / (1024 * 1024) : Math.max(0.1, file.size / 1024),
       )} ${file.size >= 1024 * 1024 ? 'Mo' : 'Ko'}${file.pages ? ` · ${fmtNum(file.pages)} p. dans le PDF` : ''}`
-    : 'PDF ou EPUB, 50 Mo maximum.';
+    : `PDF jusqu’à ${FILE_LIMIT_MIB.pdf} Mo · EPUB jusqu’à ${FILE_LIMIT_MIB.epub} Mo.`;
   return `
     <p class="small muted" role="status">${fileBusy || detail}</p>
     ${file?.pageMismatch && expected ? `<p class="small muted">La fiche indique ${fmtNum(expected)} pages. Ce PDF est peut-être un extrait ou une autre édition.</p>` : ''}
@@ -890,10 +931,10 @@ function readingFileContent(sheet) {
         data-action="find-reading-pdf" ${fileBusy || sheet.fileSearch?.loading ? 'disabled' : ''}>
         ${icon('search')} Trouver le PDF
       </button>` : ''}
-      ${state.bookSourceAvailable ? `<button class="btn ${file || expected ? 'btn-ghost' : 'btn-primary'}" type="button"
+      <button class="btn ${file || (state.bookSourceAvailable && expected) ? 'btn-ghost' : 'btn-primary'}" type="button"
         data-action="search-reading-file" ${fileBusy || sheet.fileSearch?.loading ? 'disabled' : ''}>
         ${icon('search')} Chercher une édition
-      </button>` : ''}
+      </button>
       <button class="btn ${file || state.bookSourceAvailable ? 'btn-ghost' : 'btn-primary'}" type="button" data-action="pick-reading-file" ${fileBusy ? 'disabled' : ''}>
         ${icon('upload')} ${file ? 'Remplacer' : 'Ajouter un fichier'}
       </button>
@@ -940,7 +981,7 @@ function applyReadingJob(sheet, job, updateFile = true) {
 
 async function followReadingJob(sheet, job) {
   if (job.status === 'running') {
-    sheet.fileBusy = readingJobLabels[job.operation];
+    sheet.fileBusy = job.message || readingJobLabels[job.operation];
     refreshReadingFile(sheet);
   }
   let failures = 0;
@@ -952,6 +993,10 @@ async function followReadingJob(sheet, job) {
         signal: AbortSignal.timeout(10_000),
       });
       job = payload.job;
+      if (job?.status === 'running' && job.message && job.message !== sheet.fileBusy) {
+        sheet.fileBusy = job.message;
+        refreshReadingFile(sheet);
+      }
       failures = 0;
     } catch (error) {
       if (++failures < 5 && (!error.status || error.status >= 500)) continue;
@@ -989,6 +1034,7 @@ async function loadReadingFile(sheet) {
   try {
     const payload = await api(`${readingFileUrl(sheet.id)}?info=1`);
     sheet.file = payload.file;
+    if (payload.search) sheet.fileSearch = payload.search;
     if (payload.job?.status === 'running') {
       followReadingJob(sheet, payload.job);
       return;
@@ -1832,8 +1878,8 @@ document.addEventListener('change', async (event) => {
     const contentType = extension === 'pdf' ? 'application/pdf' : 'application/epub+zip';
     if (!['pdf', 'epub'].includes(extension)) {
       showToast('Choisis un fichier PDF ou EPUB.', 'error');
-    } else if (file.size > 50 * 1024 * 1024) {
-      showToast('Le fichier dépasse 50 Mo.', 'error');
+    } else if (file.size > FILE_LIMIT_MIB[extension] * 1024 * 1024) {
+      showToast(`Le fichier dépasse ${FILE_LIMIT_MIB[extension]} Mo.`, 'error');
     } else {
       saveReadingFile(state.sheet, { method: 'PUT', file, contentType }, 'Fichier enregistré');
     }

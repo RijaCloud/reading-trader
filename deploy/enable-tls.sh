@@ -80,6 +80,14 @@ server {
     auth_basic "Lectures";
     auth_basic_user_file /etc/nginx/.htpasswd-lectures;
 
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 240s;
+    proxy_buffering off;
+
     # Le défi ACME doit rester joignable en HTTPS aussi : derrière le proxy
     # Cloudflare, les renouvellements arrivent par là (301 « Always Use HTTPS »).
     # Le jeton est public et à usage unique, l'exemption ne fuit aucune donnée.
@@ -90,15 +98,14 @@ server {
         try_files $uri =404;
     }
 
+    location ~ ^/api/books/[^/]+/file/?$ {
+        client_max_body_size 200m;
+        proxy_request_buffering off;
+        proxy_pass http://127.0.0.1:8787;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8787;
-        proxy_http_version 1.1;
-        proxy_set_header Host              $host;
-        proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 240s;
-        proxy_buffering off;
     }
 }
 CONF

@@ -111,16 +111,23 @@ Deux façons d'ajouter un livre :
    préremplis ; vous validez.
 2. **Saisie manuelle** : titre, auteur, pages.
 
-Dans la fiche d'un livre, **Fichier de lecture** permet d'ajouter un PDF ou un
-EPUB de 50 Mo maximum depuis votre appareil. **Lire le PDF** ouvre le lecteur
+Dans la fiche d'un livre, **Fichier de lecture** permet d'ajouter un PDF
+de 200 Mo maximum ou un EPUB de 50 Mo maximum. **Lire le PDF** ouvre le lecteur
 intégré. **Télécharger** récupère le PDF ou l'EPUB pour
 le lire hors ligne. Les EPUB s'ouvrent dans un lecteur compatible.
+Les clients compatibles peuvent reprendre un téléchargement interrompu
+si le fichier joint n'a pas changé.
 
 Quand le MCP est configuré, **Chercher une édition** interroge aussi ses
 sources avec le titre et l'auteur de la fiche. **Récupérer** télécharge
 l'édition sélectionnée sur le serveur et l'associe à cette fiche.
+Les notices d'édition d'Open Library restent consultables si un fournisseur
+de fichiers échoue. Les possibilités de lecture ou d'emprunt figurent sur
+la page de chaque notice.
 Avec un nombre de pages renseigné, **Trouver le PDF** essaie jusqu'à trois
-éditions compatibles de Library Genesis. Le serveur vérifie le nombre de
+éditions compatibles de Library Genesis. Parmi les éditions de pagination
+proche, il essaie d'abord les fichiers les plus légers. Une recherche récente
+peut être réutilisée. Le serveur vérifie le nombre de
 pages réellement présent dans le PDF avant de l'ajouter. Une différence de
 pagination est tolérée pour les variantes d'édition. Le fichier déjà joint
 est conservé tant qu'aucun PDF compatible n'est confirmé.

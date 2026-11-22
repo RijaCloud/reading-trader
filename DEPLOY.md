@@ -25,7 +25,7 @@ seul point d'entrée.
 | --- | --- |
 | Code | `/var/www/reading-tracker` (root:root, lecture seule pour le service) |
 | Données | `/var/lib/reading-tracker/library.json` (user `lectures`) |
-| Fichiers de lecture | `/var/lib/reading-tracker/reading-files/` (PDF et EPUB, 50 Mo maximum) |
+| Fichiers de lecture | `/var/lib/reading-tracker/reading-files/` (PDF 200 Mo, EPUB 50 Mo) |
 | Sauvegardes | `/var/lib/reading-tracker/backups/` (quotidien 03:15, rotation 14 jours) |
 | Runtime Node | `/opt/node22` (copie autonome de Node 22.16, indépendante de nvm) |
 | Service | `/etc/systemd/system/reading-tracker.service` |

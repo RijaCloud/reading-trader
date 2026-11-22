@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './lib/store.js';
-import { searchOpenLibrary } from './lib/openlibrary.js';
+import { listOpenLibraryEditions, searchOpenLibrary } from './lib/openlibrary.js';
 import { discover, invalidateDiscoverCache } from './lib/recommend.js';
 import { ReadingFiles } from './lib/reading-file.js';
 import { BookSource } from './lib/book-source.js';
@@ -46,6 +46,17 @@ function changeFiles(task) {
   const result = fileChanges.then(task);
   fileChanges = result.catch(() => {});
   return result;
+}
+
+async function searchReadingEditions(book) {
+  const catalogue = listOpenLibraryEditions(book);
+  if (!bookSource.enabled) return { rows: [], catalogue: await catalogue };
+  const files = await bookSource.search(book, { allSources: true, timeout: 30_000 }).catch((error) => ({
+    rows: [],
+    sources: error.sources || [],
+    fileSourceError: error.message,
+  }));
+  return { ...files, catalogue: await catalogue };
 }
 
 /* ------------------------------------------------------------------ */
@@ -152,15 +163,26 @@ async function handleApi(req, res, url) {
           return fail(res, 415, 'Cette demande doit être envoyée en JSON.');
         }
         const body = await readBody(req);
+        const background = url.searchParams.has('background');
         const attach = (source, row) =>
           readingFiles.attachDownload(source, book, row.format, (save) => commitReadingFile(bookId, save));
         const ref = typeof body?.ref === 'string' ? body.ref.slice(0, 512) : undefined;
-        const run = async () => {
-          if (subId === 'search') return bookSource.search(book);
-          if (subId === 'find-pdf') return bookSource.findPdf(book, attach);
-          return { file: await bookSource.acquire(bookId, ref, attach) };
+        const run = async (report) => {
+          if (subId === 'search') return searchReadingEditions(book);
+          if (subId === 'find-pdf') {
+            try {
+              const result = await bookSource.findPdf(book, attach, { background, report });
+              if (result.file) return result;
+              return { ...result, search: { ...result.search, catalogue: await listOpenLibraryEditions(book) } };
+            } catch (error) {
+              if (![502, 503, 504].includes(error.status)) throw error;
+              report?.('La recherche automatique a échoué. Consultation des autres sources…');
+              return { message: 'La recherche automatique n’a pas pu aboutir.', search: await searchReadingEditions(book) };
+            }
+          }
+          return { file: await bookSource.acquire(bookId, ref, attach, { background }) };
         };
-        if (url.searchParams.has('background')) {
+        if (background) {
           return sendJson(res, 202, { job: fileJobs.start(bookId, subId, ref, run) });
         }
         return sendJson(res, 200, await run());
@@ -180,10 +202,10 @@ async function handleApi(req, res, url) {
       if (method === 'GET' || method === 'HEAD') {
         if (method === 'GET' && url.searchParams.has('info')) {
           const info = await readingFiles.describe(bookId, book.totalPages);
-          return sendJson(res, 200, { file: info, job: fileJobs.get(bookId) });
+          return sendJson(res, 200, { file: info, job: fileJobs.get(bookId), search: fileJobs.recentSearch(bookId) });
         }
-        const served = await readingFiles.withFile(bookId, async (file, metadata) => {
-          await readingFiles.serve(req, res, file, metadata, book.title, url.searchParams.has('download'));
+        const served = await readingFiles.withFile(bookId, async (file, metadata, etag) => {
+          await readingFiles.serve(req, res, file, metadata, etag, book.title, url.searchParams.has('download'));
           return true;
         });
         if (!served) return fail(res, 404, 'Fichier de lecture introuvable.');
@@ -305,7 +327,7 @@ async function serveStatic(req, res, url) {
 /* server                                                              */
 /* ------------------------------------------------------------------ */
 
-const server = http.createServer((req, res) => {
+const server = http.createServer({ requestTimeout: 30 * 60_000 }, (req, res) => {
   const started = Date.now();
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
